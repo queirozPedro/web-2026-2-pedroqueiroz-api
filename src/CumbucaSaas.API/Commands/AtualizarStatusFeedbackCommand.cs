@@ -1,3 +1,4 @@
+using CumbucaSaas.API.TempoReal;
 using CumbucaSaas.Domain.Aggregates.FeedbackAggregate;
 using CumbucaSaas.Domain.SeedWork;
 using FluentResults;
@@ -23,7 +24,9 @@ public sealed class AtualizarStatusFeedbackCommandValidator : AbstractValidator<
     }
 }
 
-public sealed class AtualizarStatusFeedbackCommandHandler(IFeedbackRepository feedbacks)
+public sealed class AtualizarStatusFeedbackCommandHandler(
+    IFeedbackRepository feedbacks,
+    INotificadorTempoReal notificador)
     : IRequestHandler<AtualizarStatusFeedbackCommand, Result<Unit>>
 {
     public async Task<Result<Unit>> Handle(AtualizarStatusFeedbackCommand command, CancellationToken cancellationToken)
@@ -36,6 +39,9 @@ public sealed class AtualizarStatusFeedbackCommandHandler(IFeedbackRepository fe
 
         feedback.AlterarStatus(Enumeration.FromName<StatusFeedback>(command.Status));
         await feedbacks.UnitOfWork.SaveEntitiesAsync(cancellationToken);
+
+        // Só depois de gravar: quem receber o aviso já recarrega o dado novo.
+        await notificador.NotificarAsync("dashboard-atualizado", cancellationToken);
 
         return Result.Ok(Unit.Value);
     }

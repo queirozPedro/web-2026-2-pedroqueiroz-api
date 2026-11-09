@@ -1,12 +1,18 @@
+using Amazon.Lambda.AspNetCoreServer.Hosting;
 using CumbucaSaas.API.Behaviors;
 using CumbucaSaas.API.Commands;
 using CumbucaSaas.API.Queries;
+using CumbucaSaas.API.TempoReal;
 using CumbucaSaas.Infrastructure;
 using FluentValidation;
 
 const string CorsFront = "front";
 
 var builder = WebApplication.CreateBuilder(args);
+
+// No Lambda, as requisições da HTTP API (API Gateway) viram requisições do ASP.NET.
+// Fora do Lambda (Visual Studio, local) esta linha não faz nada.
+builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -26,6 +32,10 @@ builder.Services.AddScoped<IValidator<AtualizarStatusFeedbackCommand>, Atualizar
 var connectionString = builder.Configuration.GetConnectionString(DependencyInjection.ConnectionStringName)!;
 builder.Services.AddScoped<IFeedbackQueries>(_ => new FeedbackQueries(connectionString));
 builder.Services.AddSingleton<IDashboardQueries, DashboardMockQueries>();
+
+// Avisa o front, pela WebSocket API, quando algum command muda os dados.
+builder.Services.Configure<TempoRealOptions>(builder.Configuration.GetSection(TempoRealOptions.Secao));
+builder.Services.AddSingleton<INotificadorTempoReal, NotificadorWebSocket>();
 
 var origens = builder.Configuration.GetSection("Cors:Origens").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>

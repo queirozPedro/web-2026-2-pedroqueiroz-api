@@ -480,3 +480,6 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Pacote da Lambda (aws/DEPLOY.md)
+/cumbuca-api.zip
