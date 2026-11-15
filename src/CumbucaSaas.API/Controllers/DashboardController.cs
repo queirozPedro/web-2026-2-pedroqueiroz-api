@@ -1,9 +1,12 @@
 using CumbucaSaas.API.Queries;
+using CumbucaSaas.API.Autenticacao;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CumbucaSaas.API.Controllers;
 
 [ApiController]
+[Authorize(Policy = Perfis.Funcionario)]
 [Route("api/dashboard")]
 public sealed class DashboardController(IDashboardQueries queries) : ControllerBase
 {

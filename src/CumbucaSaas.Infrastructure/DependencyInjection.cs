@@ -1,4 +1,8 @@
+using CumbucaSaas.Domain.Aggregates.CalendarioAggregate;
+using CumbucaSaas.Domain.Aggregates.ConsumoAggregate;
+using CumbucaSaas.Domain.Aggregates.EstudanteAggregate;
 using CumbucaSaas.Domain.Aggregates.FeedbackAggregate;
+using CumbucaSaas.Domain.Aggregates.UsuarioAggregate;
 using CumbucaSaas.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -17,7 +21,12 @@ public static class DependencyInjection
 
         services.AddDbContext<CumbucaDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<IFeedbackRepository, FeedbackRepository>();
+        services.AddScoped<ICalendarioRefeicaoRepository, CalendarioRefeicaoRepository>();
+        services.AddScoped<IEstudanteRepository, EstudanteRepository>();
+        services.AddScoped<IRegistroConsumoRepository, RegistroConsumoRepository>();
+        services.AddScoped<IUsuarioRepository, UsuarioRepository>();
 
+        // O CumbucaDbContext também depende de IUsuarioAtual (auditoria), registrado pela API.
         return services;
     }
 }

@@ -3,24 +3,25 @@ using CumbucaSaas.Domain.SeedWork;
 
 namespace CumbucaSaas.Domain.Aggregates.FeedbackAggregate;
 
-/// <summary>Feedback de um estudante, com as avaliações por categoria.</summary>
+/// <summary>Feedback de um estudante, com uma avaliação (1 a 5) para cada categoria.</summary>
 public class Feedback : AggregateRoot
 {
+    public const int ComentarioTamanhoMaximo = 2000;
+
     private readonly List<Avaliacao> _avaliacoes = [];
 
     // Usado pelo EF Core.
     private Feedback()
     {
-        Categoria = null!;
         Comentario = null!;
         Status = null!;
     }
 
-    public Feedback(int estudanteId, DateOnly data, string categoria, string comentario)
+    private Feedback(int estudanteId, DateOnly data, int categoriaFeedbackId, string comentario)
     {
         EstudanteId = estudanteId;
         Data = data;
-        Categoria = categoria;
+        CategoriaFeedbackId = categoriaFeedbackId;
         Comentario = comentario;
         Status = StatusFeedback.Novo;
     }
@@ -29,7 +30,8 @@ public class Feedback : AggregateRoot
 
     public DateOnly Data { get; private set; }
 
-    public string Categoria { get; private set; }
+    /// <summary>Assunto do feedback (tabela CategoriasFeedback).</summary>
+    public int CategoriaFeedbackId { get; private set; }
 
     public string Comentario { get; private set; }
 
@@ -37,7 +39,38 @@ public class Feedback : AggregateRoot
 
     public IReadOnlyCollection<Avaliacao> Avaliacoes => _avaliacoes.AsReadOnly();
 
-    public void Avaliar(CategoriaAvaliacao categoria, int nota)
+    /// <summary>
+    /// Estudante envia o feedback com nota para todas as categorias de avaliação: o
+    /// dashboard calcula a média de cada categoria sobre todos os feedbacks.
+    /// </summary>
+    public static Feedback Enviar(
+        int estudanteId,
+        DateOnly data,
+        int categoriaFeedbackId,
+        string comentario,
+        IReadOnlyDictionary<CategoriaAvaliacao, int> notas)
+    {
+        if (string.IsNullOrWhiteSpace(comentario))
+        {
+            throw new DomainException("Escreva o comentário do feedback.");
+        }
+
+        var faltando = Enumeration.GetAll<CategoriaAvaliacao>().Where(c => !notas.ContainsKey(c)).ToList();
+        if (faltando.Count > 0)
+        {
+            throw new DomainException($"Faltam notas para: {string.Join(", ", faltando)}.");
+        }
+
+        var feedback = new Feedback(estudanteId, data, categoriaFeedbackId, comentario.Trim());
+        foreach (var (categoria, nota) in notas)
+        {
+            feedback.Avaliar(categoria, nota);
+        }
+
+        return feedback;
+    }
+
+    private void Avaliar(CategoriaAvaliacao categoria, int nota)
     {
         if (_avaliacoes.Any(a => a.Categoria == categoria))
         {

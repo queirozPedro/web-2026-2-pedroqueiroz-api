@@ -12,4 +12,7 @@ internal sealed class FeedbackRepository(CumbucaDbContext context) : IFeedbackRe
 
     public Task<Feedback?> ObterAsync(int id, CancellationToken cancellationToken = default) =>
         context.Feedbacks.FirstOrDefaultAsync(f => f.Id == id, cancellationToken);
+
+    public Task<bool> ExisteCategoriaAsync(int categoriaFeedbackId, CancellationToken cancellationToken = default) =>
+        context.CategoriasFeedback.AnyAsync(c => c.Id == categoriaFeedbackId, cancellationToken);
 }

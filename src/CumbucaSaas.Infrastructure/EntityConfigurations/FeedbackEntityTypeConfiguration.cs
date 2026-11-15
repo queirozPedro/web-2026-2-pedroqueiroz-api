@@ -1,3 +1,4 @@
+using CumbucaSaas.Domain.Aggregates.EstudanteAggregate;
 using CumbucaSaas.Domain.Aggregates.FeedbackAggregate;
 using CumbucaSaas.Domain.SeedWork;
 using Microsoft.EntityFrameworkCore;
@@ -16,8 +17,20 @@ internal sealed class FeedbackEntityTypeConfiguration : IEntityTypeConfiguration
 
         builder.Property(f => f.EstudanteId).IsRequired();
         builder.Property(f => f.Data).IsRequired();
-        builder.Property(f => f.Categoria).HasMaxLength(60).IsRequired();
-        builder.Property(f => f.Comentario).HasMaxLength(2000).IsRequired();
+        builder.Property(f => f.CategoriaFeedbackId).IsRequired();
+        builder.Property(f => f.Comentario).HasMaxLength(Feedback.ComentarioTamanhoMaximo).IsRequired();
+
+        // Estudante e categoria só por chave estrangeira (sem navegação), com Restrict
+        // para não apagar feedbacks em cascata.
+        builder.HasOne<Estudante>()
+            .WithMany()
+            .HasForeignKey(f => f.EstudanteId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<CategoriaFeedback>()
+            .WithMany()
+            .HasForeignKey(f => f.CategoriaFeedbackId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // Enumeration é gravada pelo Id.
         builder.Property(f => f.Status)
