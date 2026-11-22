@@ -10,6 +10,13 @@ internal sealed class UsuarioRepository(CumbucaDbContext context) : IUsuarioRepo
 
     public Usuario Adicionar(Usuario usuario) => context.Usuarios.Add(usuario).Entity;
 
+    // Sem o filtro de tenant: é esta consulta que descobre o tenant do usuário.
     public Task<Usuario?> ObterPorIdExternoAsync(string idExterno, CancellationToken cancellationToken = default) =>
-        context.Usuarios.FirstOrDefaultAsync(u => u.IdExterno == idExterno, cancellationToken);
+        context.Usuarios.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.IdExterno == idExterno, cancellationToken);
+
+    public Task<bool> ExisteEmailAsync(string email, CancellationToken cancellationToken = default)
+    {
+        var normalizado = Usuario.NormalizarEmail(email);
+        return context.Usuarios.IgnoreQueryFilters().AnyAsync(u => u.Email == normalizado, cancellationToken);
+    }
 }

@@ -1,5 +1,6 @@
 using CumbucaSaas.Domain.Aggregates.CalendarioAggregate;
 using CumbucaSaas.Domain.SeedWork;
+using CumbucaSaas.Infrastructure;
 using Dapper;
 using Npgsql;
 
@@ -43,7 +44,7 @@ public interface ICalendarioQueries
 }
 
 /// <summary>Leitura direta no PostgreSQL com Dapper, sem passar pelo EF nem pelo domínio.</summary>
-public sealed class CalendarioQueries(string connectionString) : ICalendarioQueries
+public sealed class CalendarioQueries(string connectionString, ITenantAtual tenantAtual) : ICalendarioQueries
 {
     private const string SqlBase = """
         SELECT c."Id", c."Data", c."TurnoId", c."Abertura", c."Fechamento", c."Observacoes",
@@ -63,7 +64,7 @@ public sealed class CalendarioQueries(string connectionString) : ICalendarioQuer
     {
         // As datas vão como texto ISO e o PostgreSQL converte para date: evita a
         // conversão de DateOnly/DateTime para timestamp nos parâmetros.
-        var condicoes = new List<string>();
+        var condicoes = new List<string> { """c."TenantId" = @tenantId""" };
         if (inicio is not null)
         {
             condicoes.Add("""c."Data" >= CAST(@inicio AS date)""");
@@ -75,13 +76,18 @@ public sealed class CalendarioQueries(string connectionString) : ICalendarioQuer
         }
 
         var sql = SqlBase
-            + (condicoes.Count > 0 ? "\nWHERE " + string.Join(" AND ", condicoes) : "")
+            + "\nWHERE " + string.Join(" AND ", condicoes)
             + "\nORDER BY c.\"Data\", c.\"TurnoId\"";
 
         await using var conexao = new NpgsqlConnection(connectionString);
         var linhas = await conexao.QueryAsync<Linha>(new CommandDefinition(
             sql,
-            new { inicio = inicio?.ToString("yyyy-MM-dd"), fim = fim?.ToString("yyyy-MM-dd") },
+            new
+            {
+                tenantId = tenantAtual.Obrigatorio(),
+                inicio = inicio?.ToString("yyyy-MM-dd"),
+                fim = fim?.ToString("yyyy-MM-dd")
+            },
             cancellationToken: cancellationToken));
 
         return linhas.Select(Mapear).ToList();
@@ -91,8 +97,8 @@ public sealed class CalendarioQueries(string connectionString) : ICalendarioQuer
     {
         await using var conexao = new NpgsqlConnection(connectionString);
         var linha = await conexao.QuerySingleOrDefaultAsync<Linha>(new CommandDefinition(
-            SqlBase + "\nWHERE c.\"Id\" = @id",
-            new { id },
+            SqlBase + "\nWHERE c.\"Id\" = @id AND c.\"TenantId\" = @tenantId",
+            new { id, tenantId = tenantAtual.Obrigatorio() },
             cancellationToken: cancellationToken));
 
         return linha is null ? null : Mapear(linha);

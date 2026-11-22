@@ -7,7 +7,7 @@ namespace CumbucaSaas.Domain.Aggregates.EstudanteAggregate;
 /// porque o cadastro vem antes do primeiro login; na fase de autenticação, o Usuario
 /// criado no login é ligado ao Estudante pelo e-mail institucional.
 /// </summary>
-public class Estudante : AggregateRoot
+public class Estudante : AggregateRoot, IPertenceAoTenant
 {
     public const string DominioInstitucional = "@alunos.ufersa.edu.br";
     public const int NomeTamanhoMaximo = 150;
@@ -45,6 +45,9 @@ public class Estudante : AggregateRoot
         TipoSubsidio = tipoSubsidio;
         Vinculo = Vinculo.Ativo;
     }
+
+    /// <summary>Restaurante dono do registro (preenchido pelo DbContext ao gravar).</summary>
+    public int TenantId { get; private set; }
 
     public string Nome { get; private set; }
 

@@ -2,11 +2,14 @@ using CumbucaSaas.Domain.SeedWork;
 
 namespace CumbucaSaas.Domain.Aggregates.UsuarioAggregate;
 
-/// <summary>Papel do usuário no sistema (RBAC), definido pelo domínio do e-mail institucional.</summary>
+/// <summary>
+/// Papel do usuário no sistema (RBAC), definido pela forma de login: Google
+/// institucional é estudante; e-mail e senha (conta criada no cadastro) é funcionário.
+/// </summary>
 public sealed class Perfil : Enumeration
 {
-    public const string DominioFuncionario = "@ufersa.edu.br";
-    public const string DominioEstudante = "@alunos.ufersa.edu.br";
+    /// <summary>Domínio aceito no login com Google (inclui subdomínios, como alunos.ufersa.edu.br).</summary>
+    public const string DominioInstitucional = "ufersa.edu.br";
 
     public static readonly Perfil Funcionario = new(1, "funcionario");
     public static readonly Perfil Estudante = new(2, "estudante");
@@ -16,20 +19,31 @@ public sealed class Perfil : Enumeration
     }
 
     /// <summary>
-    /// @ufersa.edu.br é funcionário e @alunos.ufersa.edu.br é estudante. Os
-    /// <paramref name="funcionariosAutorizados"/> (configuração) também entram como
-    /// funcionário, para testes com contas fora do domínio. Fora disso: sem perfil (nulo).
+    /// Google: só e-mail da UFERSA, sempre como estudante (outro domínio: sem perfil, nulo).
+    /// E-mail e senha: funcionário.
     /// </summary>
-    public static Perfil? PorEmail(string email, IEnumerable<string> funcionariosAutorizados)
+    public static Perfil? PorFormaDeLogin(bool loginGoogle, string email)
     {
-        var normalizado = (email ?? string.Empty).Trim().ToLowerInvariant();
-
-        if (funcionariosAutorizados.Any(f => string.Equals(f.Trim(), normalizado, StringComparison.OrdinalIgnoreCase))
-            || normalizado.EndsWith(DominioFuncionario, StringComparison.Ordinal))
+        if (!loginGoogle)
         {
             return Funcionario;
         }
 
-        return normalizado.EndsWith(DominioEstudante, StringComparison.Ordinal) ? Estudante : null;
+        return EmailInstitucional(email) ? Estudante : null;
+    }
+
+    /// <summary>Domínio igual a ufersa.edu.br ou terminado em .ufersa.edu.br.</summary>
+    public static bool EmailInstitucional(string email)
+    {
+        var normalizado = (email ?? string.Empty).Trim().ToLowerInvariant();
+        var arroba = normalizado.LastIndexOf('@');
+        if (arroba < 0)
+        {
+            return false;
+        }
+
+        var dominio = normalizado[(arroba + 1)..];
+        return dominio == DominioInstitucional
+               || dominio.EndsWith("." + DominioInstitucional, StringComparison.Ordinal);
     }
 }

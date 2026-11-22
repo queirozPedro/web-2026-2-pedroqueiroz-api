@@ -1,6 +1,7 @@
 using CumbucaSaas.Domain.Aggregates.CalendarioAggregate;
 using CumbucaSaas.Domain.Aggregates.ConsumoAggregate;
 using CumbucaSaas.Domain.SeedWork;
+using CumbucaSaas.Infrastructure;
 using Dapper;
 using Npgsql;
 
@@ -22,7 +23,7 @@ namespace CumbucaSaas.API.Queries;
  *   fluxoPorHora consumos na 1ª, 2ª e 3ª hora a partir da abertura do turno
  *                (o que passar da 3ª hora entra na última faixa)
  */
-public sealed class DashboardQueries(string connectionString) : IDashboardQueries
+public sealed class DashboardQueries(string connectionString, ITenantAtual tenantAtual) : IDashboardQueries
 {
     private const string SqlRegistros = """
         SELECT c."Data", c."TurnoId",
@@ -64,6 +65,7 @@ public sealed class DashboardQueries(string connectionString) : IDashboardQuerie
         // conversão de DateOnly/DateTime para timestamp nos parâmetros.
         var parametros = new
         {
+            tenantId = tenantAtual.Obrigatorio(),
             inicio = inicio?.ToString("yyyy-MM-dd"),
             fim = fim?.ToString("yyyy-MM-dd"),
             estudante = TipoCliente.Estudante.Id,
@@ -75,14 +77,14 @@ public sealed class DashboardQueries(string connectionString) : IDashboardQuerie
         await using var conexao = new NpgsqlConnection(connectionString);
 
         var registros = await conexao.QueryAsync<LinhaRegistro>(new CommandDefinition(
-            string.Format(SqlRegistros, FaixaHoraria, FiltroPeriodo("c.\"Data\"", inicio, fim)),
+            string.Format(SqlRegistros, FaixaHoraria, Filtro("c", inicio, fim)),
             parametros,
             cancellationToken: cancellationToken));
 
         // Mesma leitura do FeedbackQueries (com o nome da categoria), em ordem cronológica.
         var feedbacks = await conexao.QueryAsync<FeedbackQueries.LinhaFeedback>(new CommandDefinition(
             FeedbackQueries.SqlBase
-                + "\n" + FiltroPeriodo("f.\"Data\"", inicio, fim)
+                + "\n" + Filtro("f", inicio, fim)
                 + "\nORDER BY f.\"Data\", f.\"Id\"",
             parametros,
             cancellationToken: cancellationToken));
@@ -92,9 +94,11 @@ public sealed class DashboardQueries(string connectionString) : IDashboardQuerie
             FeedbackQueries.Agrupar(feedbacks));
     }
 
-    private static string FiltroPeriodo(string coluna, DateOnly? inicio, DateOnly? fim)
+    /// <summary>Tenant da requisição e período opcional sobre a coluna "Data" da tabela <paramref name="alias"/>.</summary>
+    private static string Filtro(string alias, DateOnly? inicio, DateOnly? fim)
     {
-        var condicoes = new List<string>();
+        var coluna = $"{alias}.\"Data\"";
+        var condicoes = new List<string> { $"{alias}.\"TenantId\" = @tenantId" };
         if (inicio is not null)
         {
             condicoes.Add($"{coluna} >= CAST(@inicio AS date)");
@@ -105,7 +109,7 @@ public sealed class DashboardQueries(string connectionString) : IDashboardQuerie
             condicoes.Add($"{coluna} <= CAST(@fim AS date)");
         }
 
-        return condicoes.Count > 0 ? "WHERE " + string.Join(" AND ", condicoes) : "";
+        return "WHERE " + string.Join(" AND ", condicoes);
     }
 
     private static RegistroTurnoViewModel MapearRegistro(LinhaRegistro linha)

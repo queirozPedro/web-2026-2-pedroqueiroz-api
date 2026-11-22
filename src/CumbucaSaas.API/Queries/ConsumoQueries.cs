@@ -1,5 +1,6 @@
 using CumbucaSaas.Domain.Aggregates.ConsumoAggregate;
 using CumbucaSaas.Domain.SeedWork;
+using CumbucaSaas.Infrastructure;
 using Dapper;
 using Npgsql;
 
@@ -26,7 +27,7 @@ public interface IConsumoQueries
 }
 
 /// <summary>Leitura direta no PostgreSQL com Dapper, sem passar pelo EF nem pelo domínio.</summary>
-public sealed class ConsumoQueries(string connectionString) : IConsumoQueries
+public sealed class ConsumoQueries(string connectionString, ITenantAtual tenantAtual) : IConsumoQueries
 {
     public async Task<IReadOnlyList<ConsumoViewModel>> ListarPorTurnoAsync(
         int calendarioRefeicaoId,
@@ -37,13 +38,15 @@ public sealed class ConsumoQueries(string connectionString) : IConsumoQueries
                    r."Horario", r."ValorPago", r."FormaPagamentoId", r."FormaIdentificacaoId"
             FROM "RegistrosConsumo" r
             LEFT JOIN "Estudantes" e ON e."Id" = r."EstudanteId"
-            WHERE r."CalendarioRefeicaoId" = @calendarioRefeicaoId
+            WHERE r."CalendarioRefeicaoId" = @calendarioRefeicaoId AND r."TenantId" = @tenantId
             ORDER BY r."Horario", r."Id"
             """;
 
         await using var conexao = new NpgsqlConnection(connectionString);
         var linhas = await conexao.QueryAsync<Linha>(new CommandDefinition(
-            sql, new { calendarioRefeicaoId }, cancellationToken: cancellationToken));
+            sql,
+            new { calendarioRefeicaoId, tenantId = tenantAtual.Obrigatorio() },
+            cancellationToken: cancellationToken));
 
         return linhas
             .Select(l => new ConsumoViewModel(

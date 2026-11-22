@@ -15,6 +15,8 @@
 
   <ItemGroup>
     <PackageReference Include="Amazon.Lambda.AspNetCoreServer.Hosting" Version="1.10.0" />
+    <!-- Cria as contas de e-mail e senha (funcionários) no User Pool do Cognito. -->
+    <PackageReference Include="AWSSDK.CognitoIdentityProvider" Version="4.0.106.10" />
     <PackageReference Include="Dapper" Version="2.1.35" />
     <!-- Valida o ID token do Cognito (login com Google) nas requisições. -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.22" />

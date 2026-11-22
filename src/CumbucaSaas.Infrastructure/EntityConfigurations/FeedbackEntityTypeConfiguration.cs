@@ -14,6 +14,7 @@ internal sealed class FeedbackEntityTypeConfiguration : IEntityTypeConfiguration
         builder.ToTable("Feedbacks");
         builder.HasKey(f => f.Id);
         builder.Ignore(f => f.DomainEvents);
+        builder.PertenceAoTenant();
 
         builder.Property(f => f.EstudanteId).IsRequired();
         builder.Property(f => f.Data).IsRequired();

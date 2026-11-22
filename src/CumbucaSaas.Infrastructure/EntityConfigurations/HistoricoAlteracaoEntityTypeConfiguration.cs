@@ -14,6 +14,7 @@ internal sealed class HistoricoAlteracaoEntityTypeConfiguration : IEntityTypeCon
         builder.ToTable("HistoricoAlteracoes");
         builder.HasKey(h => h.Id);
         builder.Ignore(h => h.DomainEvents);
+        builder.PertenceAoTenant();
 
         builder.Property(h => h.Tabela).HasMaxLength(HistoricoAlteracao.TabelaTamanhoMaximo).IsRequired();
         builder.Property(h => h.DataHora).IsRequired();

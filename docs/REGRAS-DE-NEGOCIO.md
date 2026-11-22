@@ -16,30 +16,53 @@ atualize-o junto.
 
 ## 1. Perfis e acesso
 
-O login é feito pelo **Cognito (Hosted UI) com Google**. O sistema não guarda senha. O front
-envia o **ID token** do Cognito (`Authorization: Bearer`), e a API valida o emissor (User Pool)
-e a audiência (App client).
+O login é feito pelo **Cognito (Hosted UI)**, num único User Pool, de duas formas. O sistema
+não guarda senha (ela fica no Cognito). O front envia o **ID token** do Cognito
+(`Authorization: Bearer`), e a API valida o emissor (User Pool) e a audiência (App client).
 
-| Perfil | Como é definido | Pode |
-|---|---|---|
-| **Funcionário** (administrador) | e-mail `@ufersa.edu.br` **ou** listado em `Autenticacao:Funcionarios` (configuração) | dashboard, calendário, cardápio, produção, caixa, consumos, estudantes, feedbacks (consultar e mudar status), auditoria |
-| **Estudante** | e-mail `@alunos.ufersa.edu.br` | ver o calendário/cardápio, **enviar feedback**, ver os próprios feedbacks |
-| **Público externo** | não faz login | só aparece como consumo registrado pelo funcionário no balcão |
-| Outro e-mail | qualquer outro domínio | fica autenticado, mas sem perfil: **403** em tudo |
+| Perfil | Como é definido | Pode (front) | Pode (API) |
+|---|---|---|---|
+| **Funcionário** (administrador) | login com **e-mail e senha** (conta criada em `POST /api/cadastro`) | dashboard | dashboard, calendário, cardápio, produção, caixa, consumos, estudantes, feedbacks (consultar e mudar status), auditoria |
+| **Estudante** | login com **Google** e e-mail cujo domínio é `ufersa.edu.br` ou termina em `.ufersa.edu.br` | tela de feedback | ver o calendário/cardápio, **enviar feedback**, ver os próprios feedbacks |
+| **Público externo** | não faz login | — | só aparece como consumo registrado pelo funcionário no balcão |
+| Google com outro domínio | — | tela "sem acesso" | autenticado, mas sem perfil: **403** em tudo |
 
+- **A forma de login decide o perfil**, não o e-mail: o ID token de quem entrou pelo Google traz a
+  claim `identities` com `providerName: "Google"` (reserva: `cognito:username` começa com
+  `google_`); quem não traz é usuário do próprio User Pool, ou seja, funcionário. O perfil é
+  recalculado a cada requisição (`UsuarioClaimsTransformation` → `RegistrarAcessoCommand`).
 - **O funcionário não avalia a comida.** Só o perfil estudante cria feedback.
-- No **primeiro acesso**, a API cria o `Usuario`. O perfil é recalculado a cada requisição, a
-  partir do e-mail e da configuração.
+- **E-mail único no sistema inteiro**: um e-mail tem uma conta só, por uma forma de login. O
+  cadastro com um e-mail já usado devolve 409; um login com um e-mail que já pertence à outra
+  forma de login fica sem perfil (motivo `email-em-uso`).
+- No **primeiro acesso** pelo Google a API cria o `Usuario` com o **cadastro incompleto**. O
+  funcionário já nasce completo (informa tudo no cadastro).
+- **Cadastro incompleto não acessa nada**: as policies exigem a claim
+  `cumbuca_cadastro_completo = true`. Só respondem `GET /api/usuarios/me` e
+  `PUT /api/usuarios/me/cadastro`. O front manda para a tela "Complete seu cadastro".
 - O estudante é ligado ao seu cadastro do RU (`Estudante.UsuarioId`) **pelo e-mail institucional**.
   Se o e-mail não estiver cadastrado como estudante, ele faz login, mas não consegue enviar
   feedback (409).
-- `Autenticacao:Funcionarios` serve para testes com contas fora da UFERSA. Fica nos User Secrets
-  (local) ou na variável `Autenticacao__Funcionarios__0` da Lambda, **nunca no repositório**.
+
+### Cadastro de funcionário (`POST /api/cadastro`, sem token)
+Nome completo, e-mail, data de nascimento e senha, todos obrigatórios.
+- **Nome completo**: só letras (com acento), espaço, hífen e apóstrofo, com pelo menos **2
+  palavras de 3 letras ou mais** ("Ana de Souza" passa; "Li Wang" não). Até 150 caracteres.
+- **E-mail**: formato válido (`algo@dominio.tld`), até 150 caracteres. **Sem confirmação** por
+  enquanto: a conta já nasce com o e-mail verificado.
+- **Data de nascimento**: entre 01/01/1900 e hoje (UTC-3).
+- **Senha**: a política padrão do User Pool (mínimo 8, maiúscula, minúscula, número e símbolo).
+- A API cria a conta no Cognito (`AdminCreateUser` sem envio de convite +
+  `AdminSetUserPassword` definitiva) e o `Usuario` funcionário no tenant padrão. Se a gravação
+  no banco falhar, apaga a conta do Cognito.
 
 ### Permissões por rota
 
 | Rota | Acesso |
 |---|---|
+| `POST /api/cadastro` | anônimo |
+| `GET /api/usuarios/me` | qualquer token válido (mesmo sem perfil) |
+| `PUT /api/usuarios/me/cadastro` | com perfil, mesmo com o cadastro incompleto |
 | `GET /api/dashboard` | funcionário |
 | `GET /api/calendario`, `/dia/{data}`, `/{id}` | qualquer usuário logado |
 | `POST/PUT/DELETE /api/calendario...`, `PUT .../cardapio`, `.../producao`, `.../caixa` | funcionário |
@@ -50,8 +73,27 @@ e a audiência (App client).
 | `GET /api/categorias-feedback` | qualquer usuário logado |
 | `GET /api/auditoria` | funcionário |
 
+Todas as rotas de dados também exigem o cadastro concluído.
+
 Respostas: 400 (validação, com os campos), 401 (sem token ou token inválido), 403 (perfil sem
-permissão), 404 (não encontrado), 409 (conflito com o estado atual dos dados).
+permissão ou cadastro incompleto), 404 (não encontrado), 409 (conflito com o estado atual dos
+dados).
+
+### Tenant (`Tenant`, tabela `Tenants`)
+O restaurante atendido. Campos: nome e nome do responsável. Por enquanto existe **um só**,
+gravado pela migration (`HasData`): Id 1, "Restaurante Universitário: Ufersa - Campus Pau dos
+Ferros", responsável "Pedro Andrade" (provisório). **Todo usuário novo entra nele**
+(`Tenant.PadraoId`); a divisão entre tenants fica para depois.
+
+- `CalendarioRefeicoes`, `Estudantes`, `RegistrosConsumo`, `Feedbacks`, `Usuarios` e
+  `HistoricoAlteracoes` têm a coluna `TenantId` (FK Restrict). As partes owned (cardápio,
+  produção, caixa, avaliações) seguem o dono. `CategoriasFeedback` é global.
+- **Toda consulta filtra pelo tenant do usuário logado**: filtro global do EF
+  (`HasQueryFilter`) nos repositórios e `"TenantId" = @tenantId` em todo SQL das queries Dapper.
+  O tenant da requisição é definido no `RegistrarAcessoCommand` (`TenantAtual`, scoped).
+- Ao gravar, o `SaveEntitiesAsync` preenche o `TenantId` dos registros novos.
+- Únicos **por tenant**: turno (`TenantId + Data + TurnoId`), matrícula e e-mail do estudante.
+  Únicos **no sistema todo**: e-mail e `IdExterno` do usuário.
 
 ---
 
@@ -129,8 +171,14 @@ Assuntos fixos, gravados pela migration (`HasData`): 1 Cardápio, 2 Filas e espe
 `CategoriaFeedback` do front (`dashboard.models.ts`). Não há tela nem rota para editá-las.
 
 ### Usuário (`Usuario`, tabela `Usuarios`)
-Criado no primeiro login: `IdExterno` (o `sub` do Cognito, único), e-mail (único), nome
-(`name` do token ou a parte antes do @), perfil e data de criação (UTC).
+Pertence a um tenant. Campos: `IdExterno` (o `sub` do Cognito, único), e-mail do login (único
+no sistema, minúsculas), **nome completo** e **data de nascimento** (nulos até o cadastro ser
+concluído), perfil, data de criação e `CadastroConcluidoEm` (UTC; nulo = cadastro incompleto).
+- Funcionário: criado pelo cadastro, já completo.
+- Estudante: criado no primeiro login com Google, incompleto; conclui em
+  `PUT /api/usuarios/me/cadastro` (mesmas regras de nome e data do cadastro). O e-mail é sempre
+  o do login.
+- Contas anteriores a esta regra ficaram com o cadastro incompleto e passam pela mesma tela.
 
 ### Auditoria (`HistoricoAlteracao`, tabela `HistoricoAlteracoes`)
 **Toda gravação feita pelo `SaveEntitiesAsync`** gera uma linha por registro afetado: tabela,
@@ -217,7 +265,10 @@ fica nos **User Secrets** (`ConnectionStrings:CumbucaDb`), e na Lambda em
 - **Telas de cadastro no front**: calendário/cardápio, produção, caixa, ponto de venda (consumo),
   estudantes, envio de feedback pelo estudante, gestão de status. Hoje só pelo Swagger.
 - **Relatórios CSV/PDF** com filtro por período (previstos na especificação, com S3).
-- **Deploy da versão atual na Lambda**: gerar o pacote de novo (`aws/DEPLOY.md`, passo 4) e configurar
-  `Autenticacao__Funcionarios__0`. Depois disso, a API na AWS deixa de usar dados fictícios.
-- O front ainda não mostra telas por perfil: o estudante logado vê o menu do funcionário e recebe
-  "Sem acesso" no dashboard.
+- **Deploy da versão atual na Lambda**: gerar o pacote de novo (`aws/DEPLOY.md`, passo 4). A
+  LabRole precisa poder chamar `cognito-idp:AdminCreateUser`, `AdminSetUserPassword` e
+  `AdminDeleteUser` (cadastro de funcionário).
+- **Confirmação de e-mail** no cadastro de funcionário (hoje a conta nasce verificada) e
+  restrição de quem pode criar conta de funcionário (hoje qualquer pessoa cria).
+- **Divisão entre tenants**: escolher/criar o tenant do usuário (hoje todos entram no tenant 1).
+- No front, o estudante só tem a tela de feedback (o cardápio do dia ainda não tem tela).

@@ -42,6 +42,9 @@ namespace CumbucaSaas.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
                     b.Property<int?>("UsuarioId")
                         .HasColumnType("integer");
 
@@ -54,6 +57,8 @@ namespace CumbucaSaas.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("DataHora");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("UsuarioId");
 
@@ -81,13 +86,16 @@ namespace CumbucaSaas.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
                     b.Property<int>("Turno")
                         .HasColumnType("integer")
                         .HasColumnName("TurnoId");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Data", "Turno")
+                    b.HasIndex("TenantId", "Data", "Turno")
                         .IsUnique();
 
                     b.ToTable("CalendarioRefeicoes", (string)null);
@@ -118,6 +126,9 @@ namespace CumbucaSaas.Infrastructure.Migrations
                     b.Property<TimeOnly>("Horario")
                         .HasColumnType("time without time zone");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
                     b.Property<int>("TipoCliente")
                         .HasColumnType("integer")
                         .HasColumnName("TipoClienteId");
@@ -131,6 +142,8 @@ namespace CumbucaSaas.Infrastructure.Migrations
                     b.HasIndex("CalendarioRefeicaoId");
 
                     b.HasIndex("EstudanteId");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("RegistrosConsumo", (string)null);
                 });
@@ -163,6 +176,9 @@ namespace CumbucaSaas.Infrastructure.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
                     b.Property<int>("TipoSubsidio")
                         .HasColumnType("integer")
                         .HasColumnName("TipoSubsidioId");
@@ -176,13 +192,13 @@ namespace CumbucaSaas.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Email")
-                        .IsUnique();
-
-                    b.HasIndex("Matricula")
-                        .IsUnique();
-
                     b.HasIndex("UsuarioId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "Email")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "Matricula")
                         .IsUnique();
 
                     b.ToTable("Estudantes", (string)null);
@@ -278,13 +294,49 @@ namespace CumbucaSaas.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("StatusId");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CategoriaFeedbackId");
 
                     b.HasIndex("EstudanteId");
 
+                    b.HasIndex("TenantId");
+
                     b.ToTable("Feedbacks", (string)null);
+                });
+
+            modelBuilder.Entity("CumbucaSaas.Domain.Aggregates.TenantAggregate.Tenant", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("NomeResponsavel")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Tenants", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Nome = "Restaurante Universitário: Ufersa - Campus Pau dos Ferros",
+                            NomeResponsavel = "Pedro Andrade"
+                        });
                 });
 
             modelBuilder.Entity("CumbucaSaas.Domain.Aggregates.UsuarioAggregate.Usuario", b =>
@@ -295,8 +347,14 @@ namespace CumbucaSaas.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("CadastroConcluidoEm")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly?>("DataNascimento")
+                        .HasColumnType("date");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -309,13 +367,15 @@ namespace CumbucaSaas.Infrastructure.Migrations
                         .HasColumnType("character varying(100)");
 
                     b.Property<string>("Nome")
-                        .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
                     b.Property<int>("Perfil")
                         .HasColumnType("integer")
                         .HasColumnName("PerfilId");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -325,11 +385,19 @@ namespace CumbucaSaas.Infrastructure.Migrations
                     b.HasIndex("IdExterno")
                         .IsUnique();
 
+                    b.HasIndex("TenantId");
+
                     b.ToTable("Usuarios", (string)null);
                 });
 
             modelBuilder.Entity("CumbucaSaas.Domain.Aggregates.AuditoriaAggregate.HistoricoAlteracao", b =>
                 {
+                    b.HasOne("CumbucaSaas.Domain.Aggregates.TenantAggregate.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("CumbucaSaas.Domain.Aggregates.UsuarioAggregate.Usuario", null)
                         .WithMany()
                         .HasForeignKey("UsuarioId")
@@ -338,6 +406,12 @@ namespace CumbucaSaas.Infrastructure.Migrations
 
             modelBuilder.Entity("CumbucaSaas.Domain.Aggregates.CalendarioAggregate.CalendarioRefeicao", b =>
                 {
+                    b.HasOne("CumbucaSaas.Domain.Aggregates.TenantAggregate.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.OwnsOne("CumbucaSaas.Domain.Aggregates.CalendarioAggregate.Cardapio", "Cardapio", b1 =>
                         {
                             b1.Property<int>("CalendarioRefeicaoId")
@@ -429,10 +503,22 @@ namespace CumbucaSaas.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("EstudanteId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CumbucaSaas.Domain.Aggregates.TenantAggregate.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("CumbucaSaas.Domain.Aggregates.EstudanteAggregate.Estudante", b =>
                 {
+                    b.HasOne("CumbucaSaas.Domain.Aggregates.TenantAggregate.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("CumbucaSaas.Domain.Aggregates.UsuarioAggregate.Usuario", null)
                         .WithMany()
                         .HasForeignKey("UsuarioId")
@@ -450,6 +536,12 @@ namespace CumbucaSaas.Infrastructure.Migrations
                     b.HasOne("CumbucaSaas.Domain.Aggregates.EstudanteAggregate.Estudante", null)
                         .WithMany()
                         .HasForeignKey("EstudanteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CumbucaSaas.Domain.Aggregates.TenantAggregate.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -482,6 +574,15 @@ namespace CumbucaSaas.Infrastructure.Migrations
                         });
 
                     b.Navigation("Avaliacoes");
+                });
+
+            modelBuilder.Entity("CumbucaSaas.Domain.Aggregates.UsuarioAggregate.Usuario", b =>
+                {
+                    b.HasOne("CumbucaSaas.Domain.Aggregates.TenantAggregate.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

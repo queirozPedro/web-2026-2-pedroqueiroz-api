@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using Amazon;
+using Amazon.CognitoIdentityProvider;
 using Amazon.Lambda.AspNetCoreServer.Hosting;
 using CumbucaSaas.API.Autenticacao;
 using CumbucaSaas.API.Behaviors;
@@ -9,6 +11,7 @@ using CumbucaSaas.Infrastructure;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
@@ -45,9 +48,9 @@ builder.Services.AddSwaggerGen(swagger =>
     swagger.AddSecurityRequirement(new OpenApiSecurityRequirement { [esquema] = [] });
 });
 
-// Autenticação: o front manda o ID token do Cognito (login institucional via Google).
-// A API valida emissor e audiência e, a cada requisição, registra o acesso e acrescenta
-// o perfil (funcionario/estudante) definido pelo domínio do e-mail.
+// Autenticação: o front manda o ID token do Cognito (Google institucional ou e-mail e
+// senha). A API valida emissor e audiência e, a cada requisição, registra o acesso,
+// define o tenant e acrescenta o perfil: Google é estudante, e-mail e senha é funcionário.
 var autenticacao = builder.Configuration.GetSection(AutenticacaoOptions.Secao);
 builder.Services.Configure<AutenticacaoOptions>(autenticacao);
 var opcoesAutenticacao = autenticacao.Get<AutenticacaoOptions>() ?? new AutenticacaoOptions();
@@ -70,13 +73,36 @@ builder.Services
 
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy(Perfis.Funcionario, policy => policy.RequireRole(Perfis.Funcionario));
-    options.AddPolicy(Perfis.Estudante, policy => policy.RequireRole(Perfis.Estudante));
+    // Sem cadastro concluído (nome completo e data de nascimento), nenhuma rota de dados
+    // responde: só as de /api/usuarios/me, que usam as policies Logado e ComPerfil.
+    options.DefaultPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .RequireRole(Perfis.Funcionario, Perfis.Estudante)
+        .RequireClaim(Perfis.ClaimCadastroCompleto, "true")
+        .Build();
+    options.AddPolicy(Perfis.Funcionario, policy => policy
+        .RequireRole(Perfis.Funcionario)
+        .RequireClaim(Perfis.ClaimCadastroCompleto, "true"));
+    options.AddPolicy(Perfis.Estudante, policy => policy
+        .RequireRole(Perfis.Estudante)
+        .RequireClaim(Perfis.ClaimCadastroCompleto, "true"));
+    options.AddPolicy(Perfis.ComPerfil, policy => policy.RequireRole(Perfis.Funcionario, Perfis.Estudante));
+    options.AddPolicy(Perfis.Logado, policy => policy.RequireAuthenticatedUser());
 });
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IClaimsTransformation, UsuarioClaimsTransformation>();
 builder.Services.AddScoped<IUsuarioAtual, UsuarioAtual>();
+
+// Tenant da requisição: definido no RegistrarAcessoCommand, lido pelo EF e pelas queries.
+builder.Services.AddScoped<TenantAtual>();
+builder.Services.AddScoped<ITenantAtual>(sp => sp.GetRequiredService<TenantAtual>());
+
+// Cadastro de funcionário: cria a conta de e-mail e senha no User Pool (credenciais da
+// AWS pela cadeia padrão: LabRole na Lambda, arquivo de credenciais no Visual Studio).
+builder.Services.AddSingleton<IAmazonCognitoIdentityProvider>(_ =>
+    new AmazonCognitoIdentityProviderClient(RegionEndpoint.GetBySystemName(opcoesAutenticacao.Regiao)));
+builder.Services.AddScoped<IProvedorIdentidade, CognitoProvedorIdentidade>();
 
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -98,15 +124,18 @@ builder.Services.AddScoped<IValidator<AlterarVinculoEstudanteCommand>, AlterarVi
 builder.Services.AddScoped<IValidator<RegistrarConsumoCommand>, RegistrarConsumoCommandValidator>();
 builder.Services.AddScoped<IValidator<CancelarConsumoCommand>, CancelarConsumoCommandValidator>();
 builder.Services.AddScoped<IValidator<EnviarFeedbackCommand>, EnviarFeedbackCommandValidator>();
+builder.Services.AddScoped<IValidator<CadastrarFuncionarioCommand>, CadastrarFuncionarioCommandValidator>();
+builder.Services.AddScoped<IValidator<ConcluirCadastroCommand>, ConcluirCadastroCommandValidator>();
 
-// Queries: leitura direta (Dapper).
+// Queries: leitura direta (Dapper), sempre filtrada pelo tenant da requisição.
 var connectionString = builder.Configuration.GetConnectionString(DependencyInjection.ConnectionStringName)!;
-builder.Services.AddScoped<IFeedbackQueries>(_ => new FeedbackQueries(connectionString));
-builder.Services.AddScoped<ICalendarioQueries>(_ => new CalendarioQueries(connectionString));
-builder.Services.AddScoped<IEstudanteQueries>(_ => new EstudanteQueries(connectionString));
-builder.Services.AddScoped<IConsumoQueries>(_ => new ConsumoQueries(connectionString));
-builder.Services.AddScoped<IDashboardQueries>(_ => new DashboardQueries(connectionString));
-builder.Services.AddScoped<IAuditoriaQueries>(_ => new AuditoriaQueries(connectionString));
+builder.Services.AddScoped<IFeedbackQueries>(sp => new FeedbackQueries(connectionString, sp.GetRequiredService<ITenantAtual>()));
+builder.Services.AddScoped<ICalendarioQueries>(sp => new CalendarioQueries(connectionString, sp.GetRequiredService<ITenantAtual>()));
+builder.Services.AddScoped<IEstudanteQueries>(sp => new EstudanteQueries(connectionString, sp.GetRequiredService<ITenantAtual>()));
+builder.Services.AddScoped<IConsumoQueries>(sp => new ConsumoQueries(connectionString, sp.GetRequiredService<ITenantAtual>()));
+builder.Services.AddScoped<IDashboardQueries>(sp => new DashboardQueries(connectionString, sp.GetRequiredService<ITenantAtual>()));
+builder.Services.AddScoped<IAuditoriaQueries>(sp => new AuditoriaQueries(connectionString, sp.GetRequiredService<ITenantAtual>()));
+builder.Services.AddScoped<IUsuarioQueries>(sp => new UsuarioQueries(connectionString, sp.GetRequiredService<ITenantAtual>()));
 
 // Avisa o front, pela WebSocket API, quando algum command muda os dados.
 builder.Services.Configure<TempoRealOptions>(builder.Configuration.GetSection(TempoRealOptions.Secao));

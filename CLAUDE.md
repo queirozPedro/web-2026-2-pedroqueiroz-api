@@ -16,6 +16,11 @@ pendências. Ao mudar uma regra, atualize o documento no mesmo commit.
 - A API é aberta e executada pelo **Visual Studio** (perfil `https`, https://localhost:7048).
 - Migrations são geradas e aplicadas pelo **Package Manager Console** (comandos no documento de
   regras, seção 4). O banco é um só para local e AWS.
-- Segredos (connection string, e-mails de funcionário de teste) ficam nos **User Secrets** ou nas
-  variáveis da Lambda, nunca em arquivo versionado.
+- Segredos (connection string) ficam nos **User Secrets** ou nas variáveis da Lambda, nunca em
+  arquivo versionado.
+- **Tenant**: toda leitura e gravação fica no tenant do usuário logado (filtro global do EF e
+  `"TenantId" = @tenantId` em todo SQL Dapper). Tabela nova de dados do restaurante implementa
+  `IPertenceAoTenant` e ganha o filtro no `CumbucaDbContext`.
+- O cadastro de funcionário chama o Cognito: rodando pelo Visual Studio, a API precisa das
+  credenciais do Learner Lab em `%USERPROFILE%\.aws\credentials` (ver `aws/DEPLOY.md`).
 - Branch de trabalho: `staging`. A `main` recebe o merge.

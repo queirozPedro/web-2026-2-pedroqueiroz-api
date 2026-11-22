@@ -11,10 +11,9 @@ public sealed class AutenticacaoOptions
     /// <summary>App client do Cognito: o "aud" do ID token que o front envia.</summary>
     public string ClientId { get; set; } = "";
 
-    /// <summary>
-    /// E-mails fora de @ufersa.edu.br que também entram como funcionário (ex.: conta
-    /// pessoal para testes). Configure nos User Secrets ou na Lambda
-    /// (Autenticacao__Funcionarios__0), não no appsettings do repositório.
-    /// </summary>
-    public string[] Funcionarios { get; set; } = [];
+    /// <summary>Id do User Pool (ex.: us-east-1_RrRiFZVGe): o último trecho do Authority.</summary>
+    public string UserPoolId => Authority.TrimEnd('/').Split('/').Last();
+
+    /// <summary>Região do User Pool (ex.: us-east-1): o prefixo do UserPoolId.</summary>
+    public string Regiao => UserPoolId.Split('_')[0];
 }

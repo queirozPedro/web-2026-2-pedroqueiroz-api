@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace CumbucaSaas.Infrastructure.EntityConfigurations;
 
-/// <summary>Tabela "Estudantes", com matrícula e e-mail únicos.</summary>
+/// <summary>Tabela "Estudantes", com matrícula e e-mail únicos no tenant.</summary>
 internal sealed class EstudanteEntityTypeConfiguration : IEntityTypeConfiguration<Estudante>
 {
     public void Configure(EntityTypeBuilder<Estudante> builder)
@@ -14,6 +14,7 @@ internal sealed class EstudanteEntityTypeConfiguration : IEntityTypeConfiguratio
         builder.ToTable("Estudantes");
         builder.HasKey(e => e.Id);
         builder.Ignore(e => e.DomainEvents);
+        builder.PertenceAoTenant();
         builder.Ignore(e => e.EstaAtivo);
 
         builder.Property(e => e.Nome).HasMaxLength(Estudante.NomeTamanhoMaximo).IsRequired();
@@ -32,8 +33,9 @@ internal sealed class EstudanteEntityTypeConfiguration : IEntityTypeConfiguratio
             .HasConversion(t => t.Id, id => Enumeration.FromValue<TipoSubsidio>(id))
             .IsRequired();
 
-        builder.HasIndex(e => e.Matricula).IsUnique();
-        builder.HasIndex(e => e.Email).IsUnique();
+        // Matrícula e e-mail não se repetem dentro do tenant.
+        builder.HasIndex(e => new { e.TenantId, e.Matricula }).IsUnique();
+        builder.HasIndex(e => new { e.TenantId, e.Email }).IsUnique();
 
         // 1 para 1 com o usuário do login (opcional). O índice único aceita vários nulos.
         builder.HasOne<Usuario>()

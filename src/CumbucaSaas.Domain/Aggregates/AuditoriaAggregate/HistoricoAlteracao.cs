@@ -6,7 +6,7 @@ namespace CumbucaSaas.Domain.Aggregates.AuditoriaAggregate;
 /// Uma linha gravada/alterada/apagada em alguma tabela, com os valores antes e depois
 /// (JSON). Gerado automaticamente ao salvar; não há command para criar nem editar.
 /// </summary>
-public class HistoricoAlteracao : Entity
+public class HistoricoAlteracao : Entity, IPertenceAoTenant
 {
     public const int TabelaTamanhoMaximo = 100;
 
@@ -18,6 +18,7 @@ public class HistoricoAlteracao : Entity
     }
 
     public HistoricoAlteracao(
+        int tenantId,
         int? usuarioId,
         string tabela,
         AcaoAuditoria acao,
@@ -25,6 +26,7 @@ public class HistoricoAlteracao : Entity
         string? valorAnterior,
         string? valorNovo)
     {
+        TenantId = tenantId;
         UsuarioId = usuarioId;
         Tabela = tabela;
         Acao = acao;
@@ -32,6 +34,9 @@ public class HistoricoAlteracao : Entity
         ValorAnterior = valorAnterior;
         ValorNovo = valorNovo;
     }
+
+    /// <summary>Tenant do registro alterado.</summary>
+    public int TenantId { get; private set; }
 
     /// <summary>Nulo quando a alteração não veio de um usuário logado (ex.: o próprio cadastro no 1º login).</summary>
     public int? UsuarioId { get; private set; }

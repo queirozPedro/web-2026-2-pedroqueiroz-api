@@ -16,6 +16,7 @@ internal sealed class CalendarioRefeicaoEntityTypeConfiguration : IEntityTypeCon
         builder.ToTable("CalendarioRefeicoes");
         builder.HasKey(c => c.Id);
         builder.Ignore(c => c.DomainEvents);
+        builder.PertenceAoTenant();
 
         builder.Property(c => c.Data).IsRequired();
         builder.Property(c => c.Abertura).IsRequired();
@@ -28,8 +29,8 @@ internal sealed class CalendarioRefeicaoEntityTypeConfiguration : IEntityTypeCon
             .HasConversion(t => t.Id, id => Enumeration.FromValue<Turno>(id))
             .IsRequired();
 
-        // Um único almoço e uma única janta por data.
-        builder.HasIndex(c => new { c.Data, c.Turno }).IsUnique();
+        // Um único almoço e uma única janta por data em cada tenant.
+        builder.HasIndex(c => new { c.TenantId, c.Data, c.Turno }).IsUnique();
 
         // Tabela própria, com a chave primária igual à chave estrangeira (1 para 1).
         builder.OwnsOne(c => c.Cardapio, cardapio =>

@@ -1,5 +1,6 @@
 using CumbucaSaas.Domain.Aggregates.AuditoriaAggregate;
 using CumbucaSaas.Domain.SeedWork;
+using CumbucaSaas.Infrastructure;
 using Dapper;
 using Npgsql;
 
@@ -31,7 +32,7 @@ public interface IAuditoriaQueries
 }
 
 /// <summary>Leitura direta no PostgreSQL com Dapper, sem passar pelo EF nem pelo domínio.</summary>
-public sealed class AuditoriaQueries(string connectionString) : IAuditoriaQueries
+public sealed class AuditoriaQueries(string connectionString, ITenantAtual tenantAtual) : IAuditoriaQueries
 {
     public async Task<IReadOnlyList<HistoricoAlteracaoViewModel>> ListarAsync(
         string? tabela,
@@ -40,7 +41,7 @@ public sealed class AuditoriaQueries(string connectionString) : IAuditoriaQuerie
         int limite,
         CancellationToken cancellationToken = default)
     {
-        var condicoes = new List<string>();
+        var condicoes = new List<string> { "h.\"TenantId\" = @tenantId" };
         if (!string.IsNullOrWhiteSpace(tabela))
         {
             condicoes.Add("h.\"Tabela\" = @tabela");
@@ -71,6 +72,7 @@ public sealed class AuditoriaQueries(string connectionString) : IAuditoriaQuerie
             sql,
             new
             {
+                tenantId = tenantAtual.Obrigatorio(),
                 tabela = tabela?.Trim(),
                 inicio = inicio?.ToString("yyyy-MM-dd"),
                 fim = fim?.ToString("yyyy-MM-dd"),

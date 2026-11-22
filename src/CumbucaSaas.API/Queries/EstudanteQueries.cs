@@ -1,5 +1,6 @@
 using CumbucaSaas.Domain.Aggregates.EstudanteAggregate;
 using CumbucaSaas.Domain.SeedWork;
+using CumbucaSaas.Infrastructure;
 using Dapper;
 using Npgsql;
 
@@ -27,7 +28,7 @@ public interface IEstudanteQueries
 }
 
 /// <summary>Leitura direta no PostgreSQL com Dapper, sem passar pelo EF nem pelo domínio.</summary>
-public sealed class EstudanteQueries(string connectionString) : IEstudanteQueries
+public sealed class EstudanteQueries(string connectionString, ITenantAtual tenantAtual) : IEstudanteQueries
 {
     private const string SqlBase = """
         SELECT e."Id", e."Nome", e."Email", e."Matricula", e."Curso", e."VinculoId", e."TipoSubsidioId"
@@ -41,27 +42,32 @@ public sealed class EstudanteQueries(string connectionString) : IEstudanteQuerie
         int? vinculoId = Enumeration.TryFromName<Vinculo>(vinculo, out var filtro) ? filtro.Id : null;
 
         var sql = SqlBase
-            + (vinculoId is null ? "" : "\nWHERE e.\"VinculoId\" = @vinculoId")
+            + "\nWHERE e.\"TenantId\" = @tenantId"
+            + (vinculoId is null ? "" : " AND e.\"VinculoId\" = @vinculoId")
             + "\nORDER BY e.\"Nome\"";
 
         await using var conexao = new NpgsqlConnection(connectionString);
         var linhas = await conexao.QueryAsync<Linha>(new CommandDefinition(
-            sql, new { vinculoId }, cancellationToken: cancellationToken));
+            sql, new { vinculoId, tenantId = tenantAtual.Obrigatorio() }, cancellationToken: cancellationToken));
 
         return linhas.Select(Mapear).ToList();
     }
 
     public Task<EstudanteViewModel?> ObterPorIdAsync(int id, CancellationToken cancellationToken = default) =>
-        ObterUmAsync("e.\"Id\" = @id", new { id }, cancellationToken);
+        ObterUmAsync("e.\"Id\" = @id", new { id, tenantId = tenantAtual.Obrigatorio() }, cancellationToken);
 
     public Task<EstudanteViewModel?> ObterPorMatriculaAsync(string matricula, CancellationToken cancellationToken = default) =>
-        ObterUmAsync("e.\"Matricula\" = @matricula", new { matricula = matricula.Trim() }, cancellationToken);
+        ObterUmAsync(
+            "e.\"Matricula\" = @matricula",
+            new { matricula = matricula.Trim(), tenantId = tenantAtual.Obrigatorio() },
+            cancellationToken);
 
+    /// <summary><paramref name="parametros"/> precisa trazer o tenantId.</summary>
     private async Task<EstudanteViewModel?> ObterUmAsync(string condicao, object parametros, CancellationToken cancellationToken)
     {
         await using var conexao = new NpgsqlConnection(connectionString);
         var linha = await conexao.QuerySingleOrDefaultAsync<Linha>(new CommandDefinition(
-            SqlBase + "\nWHERE " + condicao, parametros, cancellationToken: cancellationToken));
+            SqlBase + "\nWHERE e.\"TenantId\" = @tenantId AND " + condicao, parametros, cancellationToken: cancellationToken));
 
         return linha is null ? null : Mapear(linha);
     }

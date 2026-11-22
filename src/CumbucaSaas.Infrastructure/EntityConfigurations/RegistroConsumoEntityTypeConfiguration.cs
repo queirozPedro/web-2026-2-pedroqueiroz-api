@@ -18,6 +18,7 @@ internal sealed class RegistroConsumoEntityTypeConfiguration : IEntityTypeConfig
         builder.ToTable("RegistrosConsumo");
         builder.HasKey(r => r.Id);
         builder.Ignore(r => r.DomainEvents);
+        builder.PertenceAoTenant();
 
         builder.Property(r => r.Horario).IsRequired();
         builder.Property(r => r.ValorPago).HasPrecision(10, 2).IsRequired();

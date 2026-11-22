@@ -4,7 +4,7 @@ using CumbucaSaas.Domain.SeedWork;
 namespace CumbucaSaas.Domain.Aggregates.FeedbackAggregate;
 
 /// <summary>Feedback de um estudante, com uma avaliação (1 a 5) para cada categoria.</summary>
-public class Feedback : AggregateRoot
+public class Feedback : AggregateRoot, IPertenceAoTenant
 {
     public const int ComentarioTamanhoMaximo = 2000;
 
@@ -25,6 +25,9 @@ public class Feedback : AggregateRoot
         Comentario = comentario;
         Status = StatusFeedback.Novo;
     }
+
+    /// <summary>Restaurante dono do registro (preenchido pelo DbContext ao gravar).</summary>
+    public int TenantId { get; private set; }
 
     public int EstudanteId { get; private set; }
 

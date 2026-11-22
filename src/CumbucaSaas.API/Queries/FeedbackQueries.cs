@@ -1,5 +1,6 @@
 using CumbucaSaas.Domain.Aggregates.FeedbackAggregate;
 using CumbucaSaas.Domain.SeedWork;
+using CumbucaSaas.Infrastructure;
 using Dapper;
 using Npgsql;
 
@@ -26,7 +27,7 @@ public interface IFeedbackQueries
 }
 
 /// <summary>Leitura direta no PostgreSQL com Dapper, sem passar pelo EF nem pelo domínio.</summary>
-public sealed class FeedbackQueries(string connectionString) : IFeedbackQueries
+public sealed class FeedbackQueries(string connectionString, ITenantAtual tenantAtual) : IFeedbackQueries
 {
     /// <summary>
     /// Uma linha por avaliação; FeedbackQueries.Agrupar junta as notas de cada feedback.
@@ -44,7 +45,9 @@ public sealed class FeedbackQueries(string connectionString) : IFeedbackQueries
     {
         await using var conexao = new NpgsqlConnection(connectionString);
         var linhas = await conexao.QueryAsync<LinhaFeedback>(new CommandDefinition(
-            SqlBase + "\nWHERE f.\"Id\" = @id", new { id }, cancellationToken: cancellationToken));
+            SqlBase + "\nWHERE f.\"Id\" = @id AND f.\"TenantId\" = @tenantId",
+            new { id, tenantId = tenantAtual.Obrigatorio() },
+            cancellationToken: cancellationToken));
 
         return Agrupar(linhas).FirstOrDefault();
     }
@@ -59,7 +62,7 @@ public sealed class FeedbackQueries(string connectionString) : IFeedbackQueries
         int? statusId = Enumeration.TryFromName<StatusFeedback>(status, out var filtro) ? filtro.Id : null;
 
         // Datas como texto ISO convertidas no PostgreSQL (evita DateOnly -> timestamp nos parâmetros).
-        var condicoes = new List<string>();
+        var condicoes = new List<string> { "f.\"TenantId\" = @tenantId" };
         if (statusId is not null)
         {
             condicoes.Add("f.\"StatusId\" = @statusId");
@@ -81,7 +84,7 @@ public sealed class FeedbackQueries(string connectionString) : IFeedbackQueries
         }
 
         var sql = SqlBase
-            + (condicoes.Count > 0 ? "\nWHERE " + string.Join(" AND ", condicoes) : "")
+            + "\nWHERE " + string.Join(" AND ", condicoes)
             + "\nORDER BY f.\"Data\" DESC, f.\"Id\" DESC";
 
         await using var conexao = new NpgsqlConnection(connectionString);
@@ -89,6 +92,7 @@ public sealed class FeedbackQueries(string connectionString) : IFeedbackQueries
             sql,
             new
             {
+                tenantId = tenantAtual.Obrigatorio(),
                 statusId,
                 inicio = inicio?.ToString("yyyy-MM-dd"),
                 fim = fim?.ToString("yyyy-MM-dd"),

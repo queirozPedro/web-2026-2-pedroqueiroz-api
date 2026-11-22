@@ -10,7 +10,7 @@ namespace CumbucaSaas.Domain.Aggregates.ConsumoAggregate;
 /// O valor pago não vem de fora: sai do cardápio do turno conforme o tipo de cliente.
 /// A data é a do turno (CalendarioRefeicao), por isso só o horário fica aqui.
 /// </summary>
-public class RegistroConsumo : AggregateRoot
+public class RegistroConsumo : AggregateRoot, IPertenceAoTenant
 {
     // Usado pelo EF Core.
     private RegistroConsumo()
@@ -36,6 +36,9 @@ public class RegistroConsumo : AggregateRoot
         FormaPagamento = formaPagamento;
         FormaIdentificacao = formaIdentificacao;
     }
+
+    /// <summary>Restaurante dono do registro (preenchido pelo DbContext ao gravar).</summary>
+    public int TenantId { get; private set; }
 
     public int CalendarioRefeicaoId { get; private set; }
 

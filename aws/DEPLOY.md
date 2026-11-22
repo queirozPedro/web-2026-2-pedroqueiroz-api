@@ -120,6 +120,28 @@ Faça push na branch conectada ao Amplify; ele roda o `ng build` (configuração
 
 No **Cognito → App client → Login pages**, confirme que a URL do Amplify (com `/` no fim) está nas URLs de retorno e de logout.
 
+### Cognito: login com e-mail e senha (funcionários)
+
+Estudantes entram pelo Google; funcionários, com e-mail e senha de contas que a própria API cria
+(`POST /api/cadastro`). No User Pool:
+
+1. **Fazer login** → o pool do Cumbuca usa **nome de usuário + e-mail** (e-mail como alias). A
+   API cria cada funcionário com um nome de usuário gerado (`func_...`) e o e-mail verificado; a
+   pessoa entra digitando o e-mail. (Essa opção só é escolhida na criação do pool.)
+2. **Sign-up** → desligue o **auto-cadastro** (self-registration): só a API cria funcionários.
+3. **Authentication methods → Password policy**: a API e o front seguem a política padrão
+   (8 caracteres, maiúscula, minúscula, número e símbolo). Se mudar, ajuste `RegrasUsuario.cs`
+   e `validacao.ts`.
+4. **App client → Login pages → Identity providers**: marque **Cognito user pool** junto com o
+   **Google**.
+
+A API chama `AdminCreateUser`, `AdminSetUserPassword` e `AdminDeleteUser`:
+
+- **Na Lambda**: a `LabRole` precisa dessas permissões do `cognito-idp`.
+- **No Visual Studio**: a API usa as credenciais da AWS do computador. Copie as do Learner Lab
+  (*AWS Details → AWS CLI → Show*) para `%USERPROFILE%\.aws\credentials`. Elas vencem a cada
+  sessão do lab.
+
 ## 7. Testar tudo
 
 1. Abra o front no Amplify e entre no dashboard: os dados vêm da API e aparece o selo **Ao vivo**.

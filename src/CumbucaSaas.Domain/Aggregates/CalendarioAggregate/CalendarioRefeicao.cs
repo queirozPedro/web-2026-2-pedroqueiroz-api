@@ -6,7 +6,7 @@ namespace CumbucaSaas.Domain.Aggregates.CalendarioAggregate;
 /// Um turno (almoço ou janta) servido em uma data, com horário de funcionamento e cardápio.
 /// É a âncora do RU: produção, consumo e caixa de um turno se ligam a ele.
 /// </summary>
-public class CalendarioRefeicao : AggregateRoot
+public class CalendarioRefeicao : AggregateRoot, IPertenceAoTenant
 {
     public const int ObservacoesTamanhoMaximo = 500;
 
@@ -21,6 +21,9 @@ public class CalendarioRefeicao : AggregateRoot
         Turno = null!;
         Atualizar(data, turno, abertura, fechamento, observacoes);
     }
+
+    /// <summary>Restaurante dono do registro (preenchido pelo DbContext ao gravar).</summary>
+    public int TenantId { get; private set; }
 
     public DateOnly Data { get; private set; }
 
