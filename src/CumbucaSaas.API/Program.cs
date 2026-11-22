@@ -1,10 +1,13 @@
 using System.Security.Claims;
 using Amazon;
 using Amazon.CognitoIdentityProvider;
+using Amazon.DynamoDBv2;
+using Amazon.S3;
 using Amazon.Lambda.AspNetCoreServer.Hosting;
 using CumbucaSaas.API.Autenticacao;
 using CumbucaSaas.API.Behaviors;
 using CumbucaSaas.API.Commands;
+using CumbucaSaas.API.PerfilUsuario;
 using CumbucaSaas.API.Queries;
 using CumbucaSaas.API.TempoReal;
 using CumbucaSaas.Infrastructure;
@@ -104,6 +107,15 @@ builder.Services.AddSingleton<IAmazonCognitoIdentityProvider>(_ =>
     new AmazonCognitoIdentityProviderClient(RegionEndpoint.GetBySystemName(opcoesAutenticacao.Regiao)));
 builder.Services.AddScoped<IProvedorIdentidade, CognitoProvedorIdentidade>();
 
+// Perfil do usuário (GET/PUT /profile): dados no DynamoDB e foto num bucket privado do S3.
+builder.Services.Configure<PerfilOptions>(builder.Configuration.GetSection(PerfilOptions.Secao));
+var regiaoAws = RegionEndpoint.GetBySystemName(opcoesAutenticacao.Regiao);
+builder.Services.AddSingleton<IAmazonDynamoDB>(_ => new AmazonDynamoDBClient(regiaoAws));
+builder.Services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(regiaoAws));
+builder.Services.AddScoped<IPerfisUsuario, DynamoPerfisUsuario>();
+builder.Services.AddScoped<IFotosPerfil, S3FotosPerfil>();
+builder.Services.AddScoped<IPerfilQueries, PerfilQueries>();
+
 builder.Services.AddInfrastructure(builder.Configuration);
 
 // Commands: MediatR + validação no pipeline.
@@ -126,6 +138,7 @@ builder.Services.AddScoped<IValidator<CancelarConsumoCommand>, CancelarConsumoCo
 builder.Services.AddScoped<IValidator<EnviarFeedbackCommand>, EnviarFeedbackCommandValidator>();
 builder.Services.AddScoped<IValidator<CadastrarFuncionarioCommand>, CadastrarFuncionarioCommandValidator>();
 builder.Services.AddScoped<IValidator<ConcluirCadastroCommand>, ConcluirCadastroCommandValidator>();
+builder.Services.AddScoped<IValidator<AtualizarPerfilCommand>, AtualizarPerfilCommandValidator>();
 
 // Queries: leitura direta (Dapper), sempre filtrada pelo tenant da requisição.
 var connectionString = builder.Configuration.GetConnectionString(DependencyInjection.ConnectionStringName)!;

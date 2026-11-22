@@ -135,6 +135,20 @@ Estudantes entram pelo Google; funcionários, com e-mail e senha de contas que a
 4. **App client → Login pages → Identity providers**: marque **Cognito user pool** junto com o
    **Google**.
 
+### Perfil do usuário (S3 + DynamoDB + rota /profile)
+
+1. **S3 → Criar bucket**: nome `pedroqueiroz-cumbuca-perfil` (ou outro, e configure
+   `Perfil__Bucket` na Lambda), região `us-east-1`, **Bloquear todo o acesso público** marcado.
+   As fotos são lidas por links temporários que a API gera.
+2. **DynamoDB → Criar tabela**: nome `pedroqueiroz-message-2026.2`, chave de partição `id`
+   (**String**), sem chave de classificação, capacidade **sob demanda**.
+3. **API Gateway → `CumbucaHTTP` → Rotas → Criar**: `GET /profile` e `PUT /profile`, cada uma
+   com a integração da Lambda `CumbucaApi` (a mesma do `ANY /{proxy+}`). O preflight de CORS
+   (`OPTIONS /profile`) continua indo para o `ANY /{proxy+}`; se o navegador acusar CORS no PUT,
+   crie também `OPTIONS /profile` com a mesma integração.
+4. Na Lambda e no Visual Studio, a API usa a `LabRole` / as credenciais do lab para o S3 e o
+   DynamoDB, como no Cognito.
+
 A API chama `AdminCreateUser`, `AdminSetUserPassword` e `AdminDeleteUser`:
 
 - **Na Lambda**: a `LabRole` precisa dessas permissões do `cognito-idp`.

@@ -63,6 +63,7 @@ Nome completo, e-mail, data de nascimento e senha, todos obrigatórios.
 | `POST /api/cadastro` | anônimo |
 | `GET /api/usuarios/me` | qualquer token válido (mesmo sem perfil) |
 | `PUT /api/usuarios/me/cadastro` | com perfil, mesmo com o cadastro incompleto |
+| `GET /profile`, `PUT /profile` | funcionário ou estudante (rotas próprias no API Gateway) |
 | `GET /api/dashboard` | funcionário |
 | `GET /api/calendario`, `/dia/{data}`, `/{id}` | qualquer usuário logado |
 | `POST/PUT/DELETE /api/calendario...`, `PUT .../cardapio`, `.../producao`, `.../caixa` | funcionário |
@@ -179,6 +180,20 @@ concluído), perfil, data de criação e `CadastroConcluidoEm` (UTC; nulo = cada
   `PUT /api/usuarios/me/cadastro` (mesmas regras de nome e data do cadastro). O e-mail é sempre
   o do login.
 - Contas anteriores a esta regra ficaram com o cadastro incompleto e passam pela mesma tela.
+
+### Perfil do usuário (`GET/PUT /profile`, DynamoDB + S3)
+Tela "Meu perfil" no front (`/perfil`), para funcionário e estudante.
+- `PUT /profile` (multipart/form-data): nome completo e data de nascimento (mesmas regras do
+  cadastro) e, opcional, a **foto** (JPG, PNG ou WebP, até 2 MB).
+- A foto vai para o bucket **privado** do S3 (`Perfil:Bucket`), em `perfis/{sub}/foto-{data}.{ext}`;
+  a anterior é apagada depois que a nova é gravada. A tela recebe um link temporário (1 hora).
+- O perfil vai para a tabela do DynamoDB `Perfil:Tabela` (`pedroqueiroz-message-2026.2`), um
+  item por usuário: `id` (sub do Cognito, chave de partição), `tenantId`, `email`, `nome`,
+  `dataNascimento`, `perfil`, `fotoChave`, `atualizadoEm`.
+- Nome e data de nascimento também são gravados no `Usuario` (Postgres), para o app mostrar o
+  mesmo nome em todo lugar. Se a gravação falhar, a foto nova é apagada do bucket.
+- `GET /profile` lê o item do DynamoDB; quem ainda não salvou o perfil vê os dados do cadastro,
+  sem foto.
 
 ### Auditoria (`HistoricoAlteracao`, tabela `HistoricoAlteracoes`)
 **Toda gravação feita pelo `SaveEntitiesAsync`** gera uma linha por registro afetado: tabela,
