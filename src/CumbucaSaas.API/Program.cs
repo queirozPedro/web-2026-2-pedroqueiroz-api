@@ -139,6 +139,8 @@ builder.Services.AddScoped<IValidator<EnviarFeedbackCommand>, EnviarFeedbackComm
 builder.Services.AddScoped<IValidator<CadastrarFuncionarioCommand>, CadastrarFuncionarioCommandValidator>();
 builder.Services.AddScoped<IValidator<ConcluirCadastroCommand>, ConcluirCadastroCommandValidator>();
 builder.Services.AddScoped<IValidator<AtualizarPerfilCommand>, AtualizarPerfilCommandValidator>();
+builder.Services.AddScoped<IValidator<AtualizarRestauranteCommand>, AtualizarRestauranteCommandValidator>();
+builder.Services.AddScoped<IValidator<AlterarFotoRestauranteCommand>, AlterarFotoRestauranteCommandValidator>();
 
 // Queries: leitura direta (Dapper), sempre filtrada pelo tenant da requisição.
 var connectionString = builder.Configuration.GetConnectionString(DependencyInjection.ConnectionStringName)!;
@@ -149,6 +151,10 @@ builder.Services.AddScoped<IConsumoQueries>(sp => new ConsumoQueries(connectionS
 builder.Services.AddScoped<IDashboardQueries>(sp => new DashboardQueries(connectionString, sp.GetRequiredService<ITenantAtual>()));
 builder.Services.AddScoped<IAuditoriaQueries>(sp => new AuditoriaQueries(connectionString, sp.GetRequiredService<ITenantAtual>()));
 builder.Services.AddScoped<IUsuarioQueries>(sp => new UsuarioQueries(connectionString, sp.GetRequiredService<ITenantAtual>()));
+builder.Services.AddScoped<IFuncionarioQueries>(sp => new FuncionarioQueries(connectionString, sp.GetRequiredService<ITenantAtual>()));
+builder.Services.AddScoped<IAlunoQueries>(sp => new AlunoQueries(connectionString, sp.GetRequiredService<ITenantAtual>()));
+builder.Services.AddScoped<IRestauranteQueries>(sp => new RestauranteQueries(
+    connectionString, sp.GetRequiredService<ITenantAtual>(), sp.GetRequiredService<IFotosPerfil>()));
 
 // Avisa o front, pela WebSocket API, quando algum command muda os dados.
 builder.Services.Configure<TempoRealOptions>(builder.Configuration.GetSection(TempoRealOptions.Secao));

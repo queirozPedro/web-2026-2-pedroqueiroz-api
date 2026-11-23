@@ -22,7 +22,7 @@ não guarda senha (ela fica no Cognito). O front envia o **ID token** do Cognito
 
 | Perfil | Como é definido | Pode (front) | Pode (API) |
 |---|---|---|---|
-| **Funcionário** (administrador) | login com **e-mail e senha** (conta criada em `POST /api/cadastro`) | dashboard | dashboard, calendário, cardápio, produção, caixa, consumos, estudantes, feedbacks (consultar e mudar status), auditoria |
+| **Funcionário** (administrador) | login com **e-mail e senha** (conta criada em `POST /api/cadastro`) | dashboard, Administração (funcionários, alunos, restaurante) | dashboard, calendário, cardápio, produção, caixa, consumos, estudantes, funcionários (consulta), dados do restaurante, feedbacks (consultar e mudar status), auditoria |
 | **Estudante** | login com **Google** e e-mail cujo domínio é `ufersa.edu.br` ou termina em `.ufersa.edu.br` | tela de feedback | ver o calendário/cardápio, **enviar feedback**, ver os próprios feedbacks |
 | **Público externo** | não faz login | — | só aparece como consumo registrado pelo funcionário no balcão |
 | Google com outro domínio | — | tela "sem acesso" | autenticado, mas sem perfil: **403** em tudo |
@@ -64,6 +64,9 @@ Nome completo, e-mail, data de nascimento e senha, todos obrigatórios.
 | `GET /api/usuarios/me` | qualquer token válido (mesmo sem perfil) |
 | `PUT /api/usuarios/me/cadastro` | com perfil, mesmo com o cadastro incompleto |
 | `GET /profile`, `PUT /profile` | funcionário ou estudante (rotas próprias no API Gateway) |
+| `GET /api/restaurante` | qualquer usuário logado (o front aplica as cores do restaurante) |
+| `PUT /api/restaurante`, `PUT/DELETE /api/restaurante/foto` | funcionário |
+| `GET /api/funcionarios`, `GET /api/alunos` | funcionário |
 | `GET /api/dashboard` | funcionário |
 | `GET /api/calendario`, `/dia/{data}`, `/{id}` | qualquer usuário logado |
 | `POST/PUT/DELETE /api/calendario...`, `PUT .../cardapio`, `.../producao`, `.../caixa` | funcionário |
@@ -80,11 +83,51 @@ Respostas: 400 (validação, com os campos), 401 (sem token ou token inválido),
 permissão ou cadastro incompleto), 404 (não encontrado), 409 (conflito com o estado atual dos
 dados).
 
-### Tenant (`Tenant`, tabela `Tenants`)
-O restaurante atendido. Campos: nome e nome do responsável. Por enquanto existe **um só**,
-gravado pela migration (`HasData`): Id 1, "Restaurante Universitário: Ufersa - Campus Pau dos
-Ferros", responsável "Pedro Andrade" (provisório). **Todo usuário novo entra nele**
-(`Tenant.PadraoId`); a divisão entre tenants fica para depois.
+### Tenant / restaurante (`Tenant`, tabelas `Tenants` e `HorariosFuncionamento`)
+O Restaurante Universitário atendido. Por enquanto existe **um só**, gravado pela migration
+(`HasData`): Id 1, "Restaurante Universitário: Ufersa - Campus Pau dos Ferros", responsável
+"Pedro Andrade" (provisório), Pau dos Ferros/RN. **Todo usuário novo entra nele**
+(`Tenant.PadraoId`); a divisão entre tenants fica para depois. O funcionário edita tudo em
+**Administração > Restaurante** (`PUT /api/restaurante`).
+
+| Campo | Regra |
+|---|---|
+| Nome | obrigatório, até 150 |
+| Responsável | obrigatório, até 150 |
+| Endereço | opcional, até 200 |
+| Cidade | obrigatória, até 100 |
+| UF | obrigatória, uma das 27 siglas (gravada em maiúsculas) |
+| Cor principal | `#RRGGBB` (gravada em minúsculas): fundo do menu lateral |
+| Cor secundária | `#RRGGBB`: item ativo do menu, botões e links |
+| Foto | opcional, no S3 |
+| Horário de funcionamento | por dia da semana, ver abaixo |
+
+- **Cores**: as duas ficam sob texto branco no app, então precisam de **contraste de pelo menos
+  3:1 com o branco** (cálculo da WCAG, `Tenant.ContrasteComBranco`). As cores do seed são as do
+  tema original (`#1b4535` e `#c2571e`). O front grava as cores nas variáveis CSS
+  `--color-sidebar` e `--color-accent` (e deriva `--color-accent-soft`).
+- **Horário de funcionamento** (`HorarioFuncionamento`, owned, chave `TenantId + DiaSemana +
+  TurnoId`): para cada dia da semana (0 = domingo ... 6 = sábado), no máximo **um almoço e uma
+  janta**, cada um com abertura e fechamento (fechamento depois da abertura); no mesmo dia o
+  **almoço termina antes de a janta abrir**. **Dia sem horário = fechado.** O PUT manda a semana
+  inteira; a lista é atualizada no lugar (o que saiu é removido). O seed traz um horário
+  **provisório**: segunda a sexta, almoço 11:00–13:30 e janta 17:00–19:00. Por enquanto é só
+  informativo: o turno do calendário continua com o próprio horário.
+- **Foto**: `PUT /api/restaurante/foto` (multipart, campo `foto`), JPG, PNG ou WebP até 2 MB, no
+  mesmo bucket privado das fotos de perfil (`Perfil:Bucket`), em `tenants/{id}/foto-{data}.{ext}`;
+  a anterior é apagada depois que a nova está gravada, e a nova é apagada se a gravação no banco
+  falhar. `DELETE /api/restaurante/foto` remove. O GET devolve um link temporário (1 hora).
+- Alterar o restaurante avisa os fronts pelo WebSocket (`restaurante-atualizado`), que recarregam
+  nome e cores.
+- **Usuários e alunos do restaurante**: não são coleções do `Tenant` (agregados se ligam só por
+  Id). Cada `Usuario` e `Estudante` tem o `TenantId`; as listas de Administração são
+  `GET /api/funcionarios` (usuários com perfil funcionário do tenant) e `GET /api/alunos`.
+- **Lista de alunos** (`GET /api/alunos`): junta o **cadastro do RU** (`Estudante`, feito pelo
+  funcionário, com matrícula) e a **conta** (`Usuario` com perfil estudante, criada no primeiro
+  login com Google). Uma linha por aluno: os dois ligados (`Estudante.UsuarioId` ou, antes do
+  próximo login, o mesmo e-mail), só o cadastro (ainda não entrou) ou **só a conta** (entrou,
+  mas ainda não tem cadastro no RU: matrícula, curso, vínculo e subsídio nulos; não envia
+  feedback nem consome como estudante até ser cadastrado).
 
 - `CalendarioRefeicoes`, `Estudantes`, `RegistrosConsumo`, `Feedbacks`, `Usuarios` e
   `HistoricoAlteracoes` têm a coluna `TenantId` (FK Restrict). As partes owned (cardápio,
@@ -286,4 +329,9 @@ fica nos **User Secrets** (`ConnectionStrings:CumbucaDb`), e na Lambda em
 - **Confirmação de e-mail** no cadastro de funcionário (hoje a conta nasce verificada) e
   restrição de quem pode criar conta de funcionário (hoje qualquer pessoa cria).
 - **Divisão entre tenants**: escolher/criar o tenant do usuário (hoje todos entram no tenant 1).
+- **Cardápios do restaurante**: tela e regras próprias por tenant (hoje o cardápio é por turno do
+  calendário, que já pertence ao tenant).
+- **Usar o horário de funcionamento** do restaurante como padrão ao criar turnos no calendário (e
+  impedir turno em dia fechado).
+- Cadastro de estudante e ações sobre funcionários/alunos na Administração (hoje só consulta).
 - No front, o estudante só tem a tela de feedback (o cardápio do dia ainda não tem tela).

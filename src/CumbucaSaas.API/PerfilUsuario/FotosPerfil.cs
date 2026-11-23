@@ -4,11 +4,14 @@ using Microsoft.Extensions.Options;
 
 namespace CumbucaSaas.API.PerfilUsuario;
 
-/// <summary>Fotos de perfil num bucket privado; a tela recebe um link temporário para exibir.</summary>
+/// <summary>
+/// Fotos num bucket privado (de perfil, em "perfis/{sub}", e do restaurante, em
+/// "tenants/{id}"); a tela recebe um link temporário para exibir.
+/// </summary>
 public interface IFotosPerfil
 {
-    /// <summary>Grava uma foto nova e devolve a chave (caminho) no bucket.</summary>
-    Task<string> SalvarAsync(string idUsuario, Stream conteudo, string contentType, CancellationToken cancellationToken = default);
+    /// <summary>Grava uma foto nova na <paramref name="pasta"/> e devolve a chave (caminho) no bucket.</summary>
+    Task<string> SalvarAsync(string pasta, Stream conteudo, string contentType, CancellationToken cancellationToken = default);
 
     /// <summary>Apaga sem lançar erro (a foto antiga ou a que sobrou de uma gravação que falhou).</summary>
     Task RemoverAsync(string chave);
@@ -26,14 +29,14 @@ internal sealed class S3FotosPerfil(
     private string Bucket => opcoes.Value.Bucket;
 
     public async Task<string> SalvarAsync(
-        string idUsuario,
+        string pasta,
         Stream conteudo,
         string contentType,
         CancellationToken cancellationToken = default)
     {
         // Nome novo a cada troca: o link antigo (em cache no navegador) não mostra a foto nova errada.
         var extensao = PerfilOptions.TiposFoto[contentType];
-        var chave = $"perfis/{idUsuario}/foto-{DateTime.UtcNow:yyyyMMddHHmmss}.{extensao}";
+        var chave = $"{pasta}/foto-{DateTime.UtcNow:yyyyMMddHHmmss}.{extensao}";
 
         await s3.PutObjectAsync(
             new PutObjectRequest

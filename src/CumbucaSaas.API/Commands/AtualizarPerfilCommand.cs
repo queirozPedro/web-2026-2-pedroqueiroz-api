@@ -65,7 +65,7 @@ public sealed class AtualizarPerfilCommandHandler(
         if (command.Foto is not null)
         {
             fotoNova = await fotos.SalvarAsync(
-                usuario.IdExterno, command.Foto.Conteudo, command.Foto.ContentType, cancellationToken);
+                $"perfis/{usuario.IdExterno}", command.Foto.Conteudo, command.Foto.ContentType, cancellationToken);
         }
 
         try

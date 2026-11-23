@@ -2,6 +2,7 @@ using CumbucaSaas.Domain.Aggregates.CalendarioAggregate;
 using CumbucaSaas.Domain.Aggregates.ConsumoAggregate;
 using CumbucaSaas.Domain.Aggregates.EstudanteAggregate;
 using CumbucaSaas.Domain.Aggregates.FeedbackAggregate;
+using CumbucaSaas.Domain.Aggregates.TenantAggregate;
 using CumbucaSaas.Domain.Aggregates.UsuarioAggregate;
 using CumbucaSaas.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<IEstudanteRepository, EstudanteRepository>();
         services.AddScoped<IRegistroConsumoRepository, RegistroConsumoRepository>();
         services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+        services.AddScoped<ITenantRepository, TenantRepository>();
 
         // O CumbucaDbContext também depende de IUsuarioAtual (auditoria), registrado pela API.
         return services;

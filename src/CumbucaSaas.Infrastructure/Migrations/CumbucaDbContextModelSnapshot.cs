@@ -316,6 +316,31 @@ namespace CumbucaSaas.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Cidade")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("CorPrincipal")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character(7)")
+                        .IsFixedLength();
+
+                    b.Property<string>("CorSecundaria")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character(7)")
+                        .IsFixedLength();
+
+                    b.Property<string>("Endereco")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("FotoChave")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -326,6 +351,12 @@ namespace CumbucaSaas.Infrastructure.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<string>("Uf")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character(2)")
+                        .IsFixedLength();
+
                     b.HasKey("Id");
 
                     b.ToTable("Tenants", (string)null);
@@ -334,8 +365,12 @@ namespace CumbucaSaas.Infrastructure.Migrations
                         new
                         {
                             Id = 1,
+                            Cidade = "Pau dos Ferros",
+                            CorPrincipal = "#1b4535",
+                            CorSecundaria = "#c2571e",
                             Nome = "Restaurante Universitário: Ufersa - Campus Pau dos Ferros",
-                            NomeResponsavel = "Pedro Andrade"
+                            NomeResponsavel = "Pedro Andrade",
+                            Uf = "RN"
                         });
                 });
 
@@ -574,6 +609,119 @@ namespace CumbucaSaas.Infrastructure.Migrations
                         });
 
                     b.Navigation("Avaliacoes");
+                });
+
+            modelBuilder.Entity("CumbucaSaas.Domain.Aggregates.TenantAggregate.Tenant", b =>
+                {
+                    b.OwnsMany("CumbucaSaas.Domain.Aggregates.TenantAggregate.HorarioFuncionamento", "Horarios", b1 =>
+                        {
+                            b1.Property<int>("TenantId")
+                                .HasColumnType("integer");
+
+                            b1.Property<int>("DiaSemana")
+                                .HasColumnType("integer");
+
+                            b1.Property<int>("Turno")
+                                .HasColumnType("integer")
+                                .HasColumnName("TurnoId");
+
+                            b1.Property<TimeOnly>("Abertura")
+                                .HasColumnType("time without time zone");
+
+                            b1.Property<TimeOnly>("Fechamento")
+                                .HasColumnType("time without time zone");
+
+                            b1.HasKey("TenantId", "DiaSemana", "Turno");
+
+                            b1.ToTable("HorariosFuncionamento", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("TenantId");
+
+                            b1.HasData(
+                                new
+                                {
+                                    TenantId = 1,
+                                    DiaSemana = 1,
+                                    Turno = 1,
+                                    Abertura = new TimeOnly(11, 0, 0),
+                                    Fechamento = new TimeOnly(13, 30, 0)
+                                },
+                                new
+                                {
+                                    TenantId = 1,
+                                    DiaSemana = 1,
+                                    Turno = 2,
+                                    Abertura = new TimeOnly(17, 0, 0),
+                                    Fechamento = new TimeOnly(19, 0, 0)
+                                },
+                                new
+                                {
+                                    TenantId = 1,
+                                    DiaSemana = 2,
+                                    Turno = 1,
+                                    Abertura = new TimeOnly(11, 0, 0),
+                                    Fechamento = new TimeOnly(13, 30, 0)
+                                },
+                                new
+                                {
+                                    TenantId = 1,
+                                    DiaSemana = 2,
+                                    Turno = 2,
+                                    Abertura = new TimeOnly(17, 0, 0),
+                                    Fechamento = new TimeOnly(19, 0, 0)
+                                },
+                                new
+                                {
+                                    TenantId = 1,
+                                    DiaSemana = 3,
+                                    Turno = 1,
+                                    Abertura = new TimeOnly(11, 0, 0),
+                                    Fechamento = new TimeOnly(13, 30, 0)
+                                },
+                                new
+                                {
+                                    TenantId = 1,
+                                    DiaSemana = 3,
+                                    Turno = 2,
+                                    Abertura = new TimeOnly(17, 0, 0),
+                                    Fechamento = new TimeOnly(19, 0, 0)
+                                },
+                                new
+                                {
+                                    TenantId = 1,
+                                    DiaSemana = 4,
+                                    Turno = 1,
+                                    Abertura = new TimeOnly(11, 0, 0),
+                                    Fechamento = new TimeOnly(13, 30, 0)
+                                },
+                                new
+                                {
+                                    TenantId = 1,
+                                    DiaSemana = 4,
+                                    Turno = 2,
+                                    Abertura = new TimeOnly(17, 0, 0),
+                                    Fechamento = new TimeOnly(19, 0, 0)
+                                },
+                                new
+                                {
+                                    TenantId = 1,
+                                    DiaSemana = 5,
+                                    Turno = 1,
+                                    Abertura = new TimeOnly(11, 0, 0),
+                                    Fechamento = new TimeOnly(13, 30, 0)
+                                },
+                                new
+                                {
+                                    TenantId = 1,
+                                    DiaSemana = 5,
+                                    Turno = 2,
+                                    Abertura = new TimeOnly(17, 0, 0),
+                                    Fechamento = new TimeOnly(19, 0, 0)
+                                });
+                        });
+
+                    b.Navigation("Horarios");
                 });
 
             modelBuilder.Entity("CumbucaSaas.Domain.Aggregates.UsuarioAggregate.Usuario", b =>
